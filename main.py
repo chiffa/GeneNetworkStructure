@@ -68,13 +68,13 @@ logging.info('genes in read-out:\t%s', len(read_out_genes))
 logging.info('data matrix shape:\t%s', data_matrix.shape)
 
 # Show overall factor distribution
-data = data_matrix[data_matrix > 4.]
+data = data_matrix.flatten()
 fltr = np.logical_not(np.isnan(data))
 density = gaussian_kde(data[fltr].flatten())
 xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
 plt.title('distribution of gene expression alteration in response to TF deletion')
 ax = plt.plot(xs, -np.sqrt(-np.log(density(xs))), 'k')
-# plt.plot(xs, -np.sqrt(-np.log(norm.pdf(xs))), 'r')
+plt.plot(xs, -np.sqrt(-np.log(norm.pdf(xs))), 'r')
 plt.xlabel('z-score deviation')
 plt.ylabel('distribution density (log)')
 plt.show()

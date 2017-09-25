@@ -10,7 +10,7 @@ essentiality = 0.3  # epsilon - if pathway throughput falls below this value we 
 aneup_essentiality = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_genes = 6500  # total genes in yeast
-independent_pathways = 45  # estimation of independent pathways in yeast
+independent_pathways = 55  # estimation of independent pathways in yeast
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'rb'))
 activations = pickle.load(open('activations.dmp', 'rb'))
@@ -166,13 +166,13 @@ if __name__ == "__main__":
         conditional_essentials.append(cond_ess_fraction)
 
     improved_plot(np.array(essentials_accumulator)*100,
-                  'essential genes prevalence distribution',
+                  'essential genes prevalence',
                   'percentage of all genes')
     improved_plot(np.array(lethal_accumulator)*100,
-                  'lethal interactions prevalence distribution',
+                  'lethal interactions prevalence',
                   'percentage of all non-essential gene pairs')
     improved_plot(np.array(conditional_essentials)*100,
-                  'conditional essential genes',
+                  'evolvable essential genes',
                   'percentage of all essential genes')
 
 
