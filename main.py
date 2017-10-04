@@ -26,7 +26,7 @@ ch2.setLevel(logging.DEBUG)
 ch2.setFormatter(formatter)
 root.addHandler(ch2)
 
-# set up the input and lines of interest anchors
+# set up the in_file and lines of interest anchors
 input_file = 'GSE4654_series_matrix.txt'
 genes_line = 44
 start_of_table_line = 79
