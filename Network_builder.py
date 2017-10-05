@@ -9,8 +9,8 @@ import numpy as np
 essentiality = 0.3  # epsilon - if pathway throughput falls below this value we consider pathway to fail
 aneup_essentiality = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
-total_genes = 6500  # total genes in yeast
-independent_pathways = 55  # estimation of independent pathways in yeast
+total_non_essential_pool = 5400
+independent_pathways = 19  # estimation of independent pathways in yeast
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'rb'))
 activations = pickle.load(open('activations.dmp', 'rb'))
@@ -127,7 +127,15 @@ def simulation_run():
 
             total_interactions += 1
 
-        total_interactions += len(non_essentials) * (5500 / independent_pathways)  # basically the proteins they are not in the same pathway
+        # we've calculated the genes with which they are in teh same pathway. Now we need to get a
+        # sample of genes with which they proteins are not interacting
+        finite_population_corrector = 1.-1./(total_non_essential_pool-len(non_essentials))
+        total_interactions += len(non_essentials)*(len(non_essentials)-1)/2*(independent_pathways-1)*finite_population_corrector
+
+
+        # basically the biomolecules that are not in the same pathway - that pathway representing only 1/#pathways options
+
+        # expected number of independent genes when we poll x genes out of 5500
 
     print 'current score:', float(essential_genes) / float(total_genes)
     print 'synth lethals:', float(synthetic_lethals) / float(total_interactions)
