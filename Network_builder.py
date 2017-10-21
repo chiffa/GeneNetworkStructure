@@ -11,7 +11,7 @@ aneup_essentiality = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_non_essential_pool = 5400
 independent_pathways = 17  # estimation of independent pathways in yeast
-stress_conditions = 50
+stress_conditions = 250
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'r'))
 activations = pickle.load(open('activations.dmp', 'r'))
@@ -80,6 +80,7 @@ def simulation_run():
             abs_m_chain.append(np.abs(mat))
 
         signal = np.ones((_w, 1)) / float(_w)
+        ref_signal = signal
         for mat in abs_m_chain:
             signal = np.dot(mat, signal)
         unperturbed = np.sum(signal)
@@ -103,6 +104,27 @@ def simulation_run():
                 non_essentials.append([j, i])
 
         total_genes += _l * _w
+
+
+        for j, i in non_essentials:
+            pad = np.ones((_l, _w))
+            pad[j, i] = 0
+
+            flag = False
+            for _ in range(0, stress_conditions):
+                # signal = (np.random.beta(50, 50, (_w, 1))+0.5) / float(_w)
+                # print 'stress env signal', signal/ref_signal
+                signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
+                # signal = np.ones((_w, 1)) / float(_w)
+                for k, mat in enumerate(abs_m_chain):
+                    signal = np.dot(mat, signal)
+                    signal = signal * np.expand_dims(pad[k, :], 1)
+                perturbed = np.sum(signal)
+                if perturbed / unperturbed < essentiality:
+                    flag = True
+            if flag:
+                genes_essential_in_cond += 1
+
 
         for j, i in essentials:
             pad = np.ones((_l, _w))
@@ -134,21 +156,6 @@ def simulation_run():
                 # print perturbed
                 # print '<<<<'
                 cond_essentail_genes += 1
-
-        for j, i in non_essentials:
-            pad[j, i] = 0
-
-            flag = False
-            for _ in range(0, stress_conditions):
-                signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
-                for k, mat in enumerate(abs_m_chain):
-                    signal = np.dot(mat, signal)
-                    signal = signal * np.expand_dims(pad[k, :], 1)
-                perturbed = np.sum(signal)
-                if perturbed / unperturbed < essentiality:
-                    flag = True
-            if flag:
-                genes_essential_in_cond += 1
 
 
         for gene_1, gene_2 in combinations(non_essentials, 2):
@@ -227,5 +234,5 @@ if __name__ == "__main__":
                   'evolvable essential genes',
                   'percentage of all essential genes')
     improved_plot(np.array(ess_in_cond)*100,
-                  'condition-specific essential in at least 1 out of 50 conditions',
+                  'condition-specific essential in at least 1 out of 250 conditions',
                   'percentage of all non-essential genes')
