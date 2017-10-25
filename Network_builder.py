@@ -11,7 +11,7 @@ aneup_essentiality = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_non_essential_pool = 5400
 independent_pathways = 17  # estimation of independent pathways in yeast
-stress_conditions = 250
+stress_conditions = 11
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'r'))
 activations = pickle.load(open('activations.dmp', 'r'))
@@ -45,7 +45,7 @@ activations = activations[np.logical_not(np.isnan(activations))]
 #
 # _length = f_length
 # _width = f_width
-#
+# #
 # activations = np.random.randn(*activations.shape)
 # aneup_perturbation = np.random.lognormal(0, 0.5, *aneup_perturbation.shape)
 ##
@@ -236,3 +236,8 @@ if __name__ == "__main__":
     improved_plot(np.array(ess_in_cond)*100,
                   'condition-specific essential in at least 1 out of 250 conditions',
                   'percentage of all non-essential genes')
+
+    plt.plot(_length, _width, 'ko')
+    plt.ylabel('width of the pathway')
+    plt.xlabel('length of the pathway')
+    plt.show()
