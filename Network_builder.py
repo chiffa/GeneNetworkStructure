@@ -11,7 +11,7 @@ aneup_essentiality = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_non_essential_pool = 5400
 independent_pathways = 17  # estimation of independent pathways in yeast
-stress_conditions = 250
+stress_conditions = 10
 aneuploid_passes = 20
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'r'))
@@ -26,6 +26,7 @@ _width = np.array(length_width)[:, 1]
 _width = _width[_length > min_length]
 _length = _length[_length > min_length]
 
+randomly_perturbed = False
 
 activations = np.array(activations).flatten()
 activations = activations[np.logical_not(np.isnan(activations))]
@@ -82,7 +83,10 @@ def simulation_run():
             matrix_chain.append(mat)  # meh - sparsity is bad
             abs_m_chain.append(np.abs(mat))
 
-        signal = np.ones((_w, 1)) / float(_w)
+        if randomly_perturbed:
+            signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
+        else:
+            signal = np.ones((_w, 1)) / float(_w)
         ref_signal = signal
         for mat in abs_m_chain:
             signal = np.dot(mat, signal)
@@ -95,7 +99,10 @@ def simulation_run():
             pad = np.ones((_l, _w))
             pad[j, i] = 0
 
-            signal = np.ones((_w, 1)) / float(_w)
+            if randomly_perturbed:
+                signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
+            else:
+                signal = np.ones((_w, 1)) / float(_w)
             for k, mat in enumerate(abs_m_chain):
                 signal = np.dot(mat, signal)
                 signal = signal * np.expand_dims(pad[k, :], 1)
@@ -139,7 +146,10 @@ def simulation_run():
 
             conditional_essential = False
             for _ in range(0, aneuploid_passes):
-                signal = np.ones((_w, 1)) / float(_w)
+                if randomly_perturbed:
+                    signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
+                else:
+                    signal = np.ones((_w, 1)) / float(_w)
                 aneuploid = np.ones((_w, 1)) / float(_w)
                 no_aneup = np.ones((_w, 1)) / float(_w)
                 for k, mat in enumerate(abs_m_chain):
@@ -188,7 +198,10 @@ def simulation_run():
             pad[gene_1[0], gene_1[1]] = 0
             pad[gene_2[0], gene_2[1]] = 0
 
-            signal = np.ones((_w, 1)) / float(_w)
+            if randomly_perturbed:
+                signal = (np.random.rand(_w, 1) + 0.5) / float(_w)
+            else:
+                signal = np.ones((_w, 1)) / float(_w)
             for k, mat in enumerate(abs_m_chain):
                 signal = np.dot(mat, signal)
                 signal = signal * np.expand_dims(pad[k, :], 1)
@@ -242,6 +255,7 @@ def improved_plot(data, stats_of_interest, x_axis):
     plt.legend()
     plt.show()
 
+
 if __name__ == "__main__":
     essentials_accumulator = []
     lethal_accumulator = []
@@ -249,7 +263,7 @@ if __name__ == "__main__":
     ess_in_cond = []
 
 
-    for _ in range(0, 1000):
+    for _ in range(0, 500):
         essentials_fraction, lethal_int_fraction, cond_ess_fraction, ess_in_cond_fraction, epistases = simulation_run()
         essentials_accumulator.append(essentials_fraction)
         lethal_accumulator.append(lethal_int_fraction)

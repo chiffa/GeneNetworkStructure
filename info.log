@@ -40039,3 +40039,9 @@ INFO:root:data matrix shape:	(6429L, 269L)
 2017-09-22 18:51:24,747 - root - INFO - deleted genes:	269
 2017-09-22 18:51:24,747 - root - INFO - genes in read-out:	6429
 2017-09-22 18:51:24,747 - root - INFO - data matrix shape:	(6429L, 269L)
+2018-06-25 15:41:10,501 - root - INFO - deleted genes:	269
+2018-06-25 15:41:10,504 - root - INFO - genes in read-out:	6429
+2018-06-25 15:41:10,504 - root - INFO - data matrix shape:	(6429, 269)
+2018-06-25 16:03:19,518 - root - INFO - deleted genes:	269
+2018-06-25 16:03:19,520 - root - INFO - genes in read-out:	6429
+2018-06-25 16:03:19,520 - root - INFO - data matrix shape:	(6429, 269)

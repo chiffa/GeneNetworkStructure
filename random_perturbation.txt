@@ -1,0 +1,10 @@
+non-perturbed:
+
+
+
+perturbed:
+
+essential genes prevalence; mean: 14.0717, std: 1.7849
+lethal interactions prevalence; mean: 1.2030, std: 0.1903
+evolvable essential genes; mean: 13.0562, std: 2.8846
+condition-specific essential in at least 1 out of 250 conditions; mean: 11.5214, std: 1.5213
