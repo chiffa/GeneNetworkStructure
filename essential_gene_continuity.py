@@ -6,7 +6,7 @@ import sys
 from scipy.stats import gaussian_kde, norm, chi2
 import pickle
 
-input_file = 'essentiality-ranks.tsv'
+input_file = 'essentiality_threshold-ranks.tsv'
 
 headers = []
 data_matrix = []
@@ -24,7 +24,7 @@ data = data_matrix.flatten()
 fltr = np.logical_not(np.isnan(data))
 density = gaussian_kde(data[fltr].flatten())
 xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
-plt.title('distribution of RANKS scores for gene essentiality')
+plt.title('distribution of RANKS scores for gene essentiality_threshold')
 ax = plt.plot(xs, -np.sqrt(-np.log(density(xs))), 'k')
 plt.vlines([-2], 0, -3, 'r')
 # plt.plot(xs, -np.sqrt(-np.log(norm.pdf(xs))), 'r')

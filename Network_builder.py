@@ -1,18 +1,21 @@
 import pickle
 import random
+import numpy as np
 from itertools import product, combinations
 from scipy.stats import gaussian_kde, norm, chi
 from matplotlib import pyplot as plt
+from time import time
 
-import numpy as np
-
-essentiality = 0.3  # epsilon - if pathway throughput falls below this value we consider pathway to fail
-aneup_essentiality = 0.4  # espilon for aneuploid pathway
+# declaring the variables:
+essentiality_threshold = 0.3  # epsilon - if pathway throughput falls below this value we consider pathway to fail
+aneup_essentiality_threshold = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_non_essential_pool = 5400
 independent_pathways = 17  # estimation of independent pathways in yeast
-stress_conditions = 10
-aneuploid_passes = 20
+stress_conditions = 0  # how many stress conditions are we taking in account
+aneuploid_passes = 20  # how many aneuploidy samples we perform to calcylate the statistics
+partial_stress_essentiality = essentiality_threshold
+partial_stress_essentiality = 0.6
 
 length_width = pickle.load(open('w_l_accumulator.dmp', 'r'))
 activations = pickle.load(open('activations.dmp', 'r'))
@@ -32,8 +35,8 @@ activations = np.array(activations).flatten()
 activations = activations[np.logical_not(np.isnan(activations))]
 
 # ## uncomment if we want to have random perturbations:
-# essentiality = 0.5
-# aneup_essentiality = 0.6
+# essentiality_threshold = 0.5
+# aneup_essentiality_threshold = 0.6
 #
 # independent_pathways = 50
 #
@@ -70,10 +73,13 @@ def simulation_run():
     genes_essential_in_cond = 0
     epistases = []
 
-    for _ in range(0, 100):
+    counter = 6000
+
+    while counter > 0:
         _l, _w = random.choice(length_width.tolist())
         _l = int(round(_l))
         _w = int(round(_w))
+        counter -= _l*_w
         matrix_chain = []
         abs_m_chain = []
         single_gene_effects = {}
@@ -108,14 +114,13 @@ def simulation_run():
                 signal = signal * np.expand_dims(pad[k, :], 1)
             perturbed = np.sum(signal)
             single_gene_effects[(j, i)] = perturbed / unperturbed
-            if perturbed / unperturbed < essentiality:
+            if perturbed / unperturbed < essentiality_threshold:
                 essential_genes += 1
                 essentials.append([j, i])
             else:
                 non_essentials.append([j, i])
 
         total_genes += _l * _w
-
 
         for j, i in non_essentials:
             pad = np.ones((_l, _w))
@@ -131,11 +136,10 @@ def simulation_run():
                     signal = np.dot(mat, signal)
                     signal = signal * np.expand_dims(pad[k, :], 1)
                 perturbed = np.sum(signal)
-                if perturbed / unperturbed < essentiality:
+                if perturbed / unperturbed < partial_stress_essentiality:
                     flag = True
             if flag:
                 genes_essential_in_cond += 1
-
 
         for j, i in essentials:
             pad = np.ones((_l, _w))
@@ -170,7 +174,7 @@ def simulation_run():
                 perturbed = np.sum(signal)
                 aneuploid = np.sum(aneuploid)
                 no_aneup = np.sum(no_aneup)
-                if unperturbed / perturbed < aneup_essentiality:  # we assume a bit of additional edge needed to overcome aneup fitness penalty
+                if unperturbed / perturbed < aneup_essentiality_threshold:  # we assume a bit of additional edge needed to overcome aneup fitness penalty
                     conditional_essential = True
                 #     print '----'
                 #     print pad
@@ -210,7 +214,7 @@ def simulation_run():
             g_eff_2 = single_gene_effects[(gene_2[0], gene_2[1])]
             g_eff_12 = perturbed / unperturbed
             epistases.append((g_eff_1, g_eff_2, np.log2(g_eff_12) - np.log2(g_eff_1) - np.log2(g_eff_2)))
-            if perturbed / unperturbed < essentiality:
+            if perturbed / unperturbed < essentiality_threshold:
                 synthetic_lethals += 1
 
             total_interactions += 1
@@ -227,15 +231,18 @@ def simulation_run():
 
     epistases = np.array(epistases)
 
-    print 'current score:', float(essential_genes) / float(total_genes)
-    print 'synth lethals:', float(synthetic_lethals) / float(total_interactions)
-    print 'essentials no more after aneuploidy', float(cond_essentail_genes)/float(essential_genes)
-    print 'genes essential in condition', float(genes_essential_in_cond)/float(total_genes - essential_genes)
+    print '\tcurrent score:', float(essential_genes) / float(total_genes)
+    print '\tsynth lethals:', float(synthetic_lethals) / float(total_interactions)
+    print '\tessentials no more after aneuploidy', float(cond_essentail_genes)/float(
+        essential_genes)
+    print '\tgenes essential in condition', float(genes_essential_in_cond)/float(total_genes -
+                                                                                essential_genes)
+    print '\ttotal genes covered in round', total_genes
     return float(essential_genes) / float(total_genes),\
            float(synthetic_lethals) / float(total_interactions),\
            float(cond_essentail_genes)/float(essential_genes),\
            float(genes_essential_in_cond)/float(total_genes - essential_genes),\
-           epistases
+             epistases
 
 
 def improved_plot(data, stats_of_interest, x_axis):
@@ -245,9 +252,9 @@ def improved_plot(data, stats_of_interest, x_axis):
     fltr = np.logical_not(np.isnan(data))
     density = gaussian_kde(data[fltr].flatten())
     xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
-    plt.title('Distribution of %s' % stats_of_interest)
+    plt.title('Distribution of %s\n mean: %.2f; std %.2f; ' % (stats_of_interest, mean, std))
     plt.plot(xs, density(xs), 'k', label='Distribution by simulation')
-    plt.plot(xs, norm.pdf(xs, mean, std), 'r', label='Normal fitted to the simulation')
+    # plt.plot(xs, norm.pdf(xs, mean, std), 'r', label='Normal fitted to the simulation')
     maxh = np.max(norm.pdf(xs, mean, std))
     plt.vlines([mean - 2*std, mean, mean + 2*std], 0, maxh)
     plt.xlabel(x_axis)
@@ -262,13 +269,15 @@ if __name__ == "__main__":
     conditional_essentials = []
     ess_in_cond = []
 
-
-    for _ in range(0, 500):
+    previous = time()
+    for _i in range(0, 500):
         essentials_fraction, lethal_int_fraction, cond_ess_fraction, ess_in_cond_fraction, epistases = simulation_run()
         essentials_accumulator.append(essentials_fraction)
         lethal_accumulator.append(lethal_int_fraction)
         conditional_essentials.append(cond_ess_fraction)
         ess_in_cond.append(ess_in_cond_fraction)
+        print 'round %s; %.2f s' % (_i, time() - previous)
+        previous = time()
 
     improved_plot(np.array(essentials_accumulator)*100,
                   'essential genes prevalence',

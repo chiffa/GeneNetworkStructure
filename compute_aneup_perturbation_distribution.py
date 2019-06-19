@@ -1,47 +1,48 @@
-from csv import reader as csv_reader
+import pickle
 import numpy as np
+from csv import reader as csv_reader
 from scipy.stats import gaussian_kde, norm, lognorm
 from matplotlib import pyplot as plt
 
-import pickle
-
-data_rooster = []
-abundance_list = []
-counts_list = []
+average_counts_columns = []
+strain_abundance_table = []
+strain_counts_table = []
 
 with open('nature09529-s2.csv') as source:
     reader = csv_reader(source)
-    for i, line in enumerate(reader):
+    for line_no, line in enumerate(reader):
 
-        if i == 20:
+        # slip the header data (line_no<20)
+
+        if line_no == 20:  # read the titles line
             print line[11:-2]
             for j, string in enumerate(line):
                 if 'dNSAF AVG' in string:
-                    data_rooster.append((j, j+1))
+                    average_counts_columns.append((j, j + 1))
 
-        if i > 20 and i < 2777:
-            print i
-            loc_abundance = []
-            loc_counts = []
-            for average, counts in data_rooster:
-                loc_abundance.append(line[average])
-                loc_counts.append(line[counts])
-            abundance_list.append(loc_abundance)
-            counts_list.append(loc_counts)
+        if 2777 > line_no > 20:  # read the data
+            print line_no
+            gene_in_strain_abundance = []
+            gene_in_strain_counts = []
+            for average, counts in average_counts_columns:
+                gene_in_strain_abundance.append(line[average])
+                gene_in_strain_counts.append(line[counts])
+            strain_abundance_table.append(gene_in_strain_abundance)
+            strain_counts_table.append(gene_in_strain_counts)
 
-abundance_arr = np.array(abundance_list).astype(np.float)
-counts_arr = np.array(counts_list).astype(np.int)
+strain_abundance_array = np.array(strain_abundance_table).astype(np.float)
+strain_counts_array = np.array(strain_counts_table).astype(np.int)
 
-sel_mask_1 = counts_arr[:, 0] > 1
-counts_arr = counts_arr[sel_mask_1, :]
-abundance_arr = abundance_arr[sel_mask_1, :]
+sel_mask_1 = strain_counts_array[:, 0] > 1  # we don't want to compare to 0
+strain_counts_array = strain_counts_array[sel_mask_1, :]
+strain_abundance_array = strain_abundance_array[sel_mask_1, :]
 
-norm_abundance_arr = abundance_arr / np.expand_dims(abundance_arr[:, 0], 1)
+normalized_strain_abundance_array = strain_abundance_array / np.expand_dims(strain_abundance_array[:, 0], 1)
 
-print norm_abundance_arr
-print counts_arr
+print normalized_strain_abundance_array
+print strain_counts_array
 
-data = norm_abundance_arr[:, 1:]
+data = normalized_strain_abundance_array[:, 1:]
 fltr = np.logical_not(np.isnan(data))
 density = gaussian_kde(data[fltr].flatten())
 xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
@@ -54,4 +55,4 @@ plt.ylabel('distribution density (log)')
 plt.legend()
 plt.show()
 
-pickle.dump(norm_abundance_arr, open('norm_aneup.dmp', 'wb'))
+pickle.dump(normalized_strain_abundance_array, open('norm_aneup.dmp', 'wb'))
