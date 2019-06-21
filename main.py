@@ -5,6 +5,7 @@ import logging
 import sys
 from scipy.stats import gaussian_kde, norm, chi2
 import pickle
+from itertools import product
 
 
 def set_up_loggers():
@@ -39,7 +40,7 @@ def nan_helper(value):
 
 
 # perform the actual main reading loop
-def parse_weights(weights_data_file, genes_line, start_of_table_line, end_of_table):
+def parse_weights(weights_data_file, transcription_factors_line, start_of_table_line, end_of_table):
     deleted_genes = []
     read_out_genes = []
     _data_matrix = []
@@ -47,7 +48,7 @@ def parse_weights(weights_data_file, genes_line, start_of_table_line, end_of_tab
     with open(weights_data_file, 'rb') as in_file:
         reader = csv_reader(in_file, delimiter='\t')
         for line_number, line in enumerate(reader):
-            if line_number == genes_line:
+            if line_number == transcription_factors_line:
                 deleted_genes = [string.split(' ')[0] for string in line[1:]]
             if end_of_table > line_number > start_of_table_line:
                 read_out_genes.append(line[0])
@@ -63,21 +64,74 @@ def parse_weights(weights_data_file, genes_line, start_of_table_line, end_of_tab
     logging.info('genes in read-out:\t%s', len(read_out_genes))
     logging.info('data matrix shape:\t%s', _data_matrix.shape)
 
-    return _data_matrix
+
+
+    return _data_matrix, deleted_genes, read_out_genes
+
+
+def parse_direct_connections(direct_connections_data_file):
+    TF_2_Genes = {}
+    with open(direct_connections_data_file) as source:
+        reader = csv_reader(source, delimiter=';')
+        for line in reader:
+            TF_2_Genes[line[0]] = line[1]
+
+    print TF_2_Genes
+
+
+def parse_names_maps(names_maps_files):
+    ens_2_names = {}
+    names_2_ens = {}
+    with open(names_maps_files) as source:
+        reader = csv_reader(source, delimiter="\t")
+        for line in reader:
+            print line, len(line)
+            if line[1]:
+                ens_2_names[line[0]] = line[1]
+                names_2_ens[line[1]] = line[0]
+
+    return ens_2_names, names_2_ens
+
+
+def map_activations(names_map, structure, weights, TFs, genes):
+    TFs_names = []
+    genes_names = []
+
+    for TF in TFs:
+        TF_name = TF.split(' ')[0]
+        TF_translation = names_map[TF_name]
+        TFs_names.append(TF_translation)
+
+    for gene in genes:
+        genes_names.append(names_map[gene])
+
+    # TODO: reformat structure parse to a tuple - list map (weigths, if true connection).
+
+    for i, j in product(range(genes_names), TFs_names):
 
 
 if __name__ == "__main__":
 
     set_up_loggers()
 
-    data_matrix = parse_weights(
+    connections_matrix = parse_direct_connections("RegulationTwoColumnTable_Documented_2013927.tsv")
+
+    names_map, reverse_names_map = parse_names_maps("Ensembl_to_gene_names_map.txt")
+
+    weights_matrix, TFs, genes = parse_weights(
         weights_data_file='GSE4654_series_matrix.txt',  # data source for parsing
-        genes_line=44,
+        transcription_factors_line=44,
         start_of_table_line=79,
         end_of_table=6509)
 
+    raw_activations_calculate_raw_activations = map_activations(names_map, connections_matrix,
+                                                                weights_matrix,
+                                                                TFs, genes)
+
+    raise Exception('Debugging')
+
     # Show overall factor distribution
-    data = data_matrix.flatten()
+    data = weights_matrix.flatten()
     fltr = np.logical_not(np.isnan(data))
     density = gaussian_kde(data[fltr].flatten())
     xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
@@ -88,7 +142,7 @@ if __name__ == "__main__":
     plt.ylabel('distribution density (log)')
     plt.show()
 
-    data = np.power(data_matrix, 2)
+    data = np.power(weights_matrix, 2)
     fltr = np.logical_not(np.isnan(data))
     density = gaussian_kde(data[fltr].flatten())
     xs = np.linspace(np.sqrt(data)[fltr].min(), np.sqrt(data)[fltr].max(), 200)
@@ -100,7 +154,7 @@ if __name__ == "__main__":
     plt.show()
 
     # Generate a plot for deviation in each experimental condition
-    data2 = np.sqrt(np.nanmean(np.power(data_matrix, 2), axis=1))
+    data2 = np.sqrt(np.nanmean(np.power(weights_matrix, 2), axis=1))
     ## per experimental condition
     fltr = np.logical_not(np.isnan(data2))
     density = gaussian_kde(data2[fltr].flatten())
@@ -111,7 +165,7 @@ if __name__ == "__main__":
     plt.ylabel('distribution density (log)')
     plt.show()
 
-    data3 = np.sqrt(np.nanmean(np.power(data_matrix, 2), axis=0))
+    data3 = np.sqrt(np.nanmean(np.power(weights_matrix, 2), axis=0))
     ## per gene
     fltr = np.logical_not(np.isnan(data3))
     density = gaussian_kde(data3[fltr].flatten())
@@ -122,5 +176,5 @@ if __name__ == "__main__":
     plt.ylabel('distribution density (log)')
     plt.show()
 
-    # pickle.dump(data_matrix[np.logical_or(data_matrix < -2, data_matrix > 2)], open('activations.dmp', 'wb'))
-    pickle.dump(data_matrix, open('activations.dmp', 'wb'))
+    # pickle.dump(weights_matrix[np.logical_or(weights_matrix < -2, weights_matrix > 2)], open('activations.dmp', 'wb'))
+    pickle.dump(weights_matrix, open('activations.dmp', 'wb'))

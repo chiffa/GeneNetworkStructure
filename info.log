@@ -40045,3 +40045,15 @@ INFO:root:data matrix shape:	(6429L, 269L)
 2018-06-25 16:03:19,518 - root - INFO - deleted genes:	269
 2018-06-25 16:03:19,520 - root - INFO - genes in read-out:	6429
 2018-06-25 16:03:19,520 - root - INFO - data matrix shape:	(6429, 269)
+2019-06-21 16:45:45,720 - root - INFO - deleted genes:	269
+2019-06-21 16:45:45,726 - root - INFO - genes in read-out:	6429
+2019-06-21 16:45:45,726 - root - INFO - data matrix shape:	(6429L, 269L)
+2019-06-21 16:46:15,513 - root - INFO - deleted genes:	269
+2019-06-21 16:46:15,513 - root - INFO - genes in read-out:	6429
+2019-06-21 16:46:15,513 - root - INFO - data matrix shape:	(6429L, 269L)
+2019-06-21 16:46:26,013 - root - INFO - deleted genes:	269
+2019-06-21 16:46:26,013 - root - INFO - genes in read-out:	6429
+2019-06-21 16:46:26,013 - root - INFO - data matrix shape:	(6429L, 269L)
+2019-06-21 16:46:50,979 - root - INFO - deleted genes:	269
+2019-06-21 16:46:50,980 - root - INFO - genes in read-out:	6429
+2019-06-21 16:46:50,980 - root - INFO - data matrix shape:	(6429L, 269L)
