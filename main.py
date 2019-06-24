@@ -6,6 +6,7 @@ import sys
 from scipy.stats import gaussian_kde, norm, chi2
 import pickle
 from itertools import product
+from collections import defaultdict
 
 
 def set_up_loggers():
@@ -70,13 +71,13 @@ def parse_weights(weights_data_file, transcription_factors_line, start_of_table_
 
 
 def parse_direct_connections(direct_connections_data_file):
-    TF_2_Genes = {}
+    TF_2_Genes = defaultdict(lambda: 0)
     with open(direct_connections_data_file) as source:
         reader = csv_reader(source, delimiter=';')
         for line in reader:
-            TF_2_Genes[line[0]] = line[1]
+            TF_2_Genes[line[0], line[1]] = 1
 
-    print TF_2_Genes
+    return TF_2_Genes
 
 
 def parse_names_maps(names_maps_files):
@@ -87,27 +88,95 @@ def parse_names_maps(names_maps_files):
         for line in reader:
             print line, len(line)
             if line[1]:
-                ens_2_names[line[0]] = line[1]
-                names_2_ens[line[1]] = line[0]
+                ens_2_names[str.upper(line[0])] = str.upper(line[1])
+                names_2_ens[str.upper(line[1])] = str.upper(line[0])
 
     return ens_2_names, names_2_ens
 
 
-def map_activations(names_map, structure, weights, TFs, genes):
+def calculate_raw_activations(names_map, reverse_names_map, structure, weights, TFs, genes):
     TFs_names = []
+    TF_trans_counter = [0, 0]
+
     genes_names = []
+    genes_trans_counter = [0, 0]
 
     for TF in TFs:
         TF_name = TF.split(' ')[0]
-        TF_translation = names_map[TF_name]
-        TFs_names.append(TF_translation)
+        try:
+            TFs_names.append(names_map[str.upper(TF_name)])
+        except KeyError:
+            TF_trans_counter[1] += 1
+            # print 'Failed to translate TF: %s' % TF_name
+        else:
+            TF_trans_counter[0] += 1
+            # print 'Translated TF: %s to %s' % (TF_name, names_map[str.upper(TF_name)])
 
     for gene in genes:
-        genes_names.append(names_map[gene])
+        try:
+            genes_names.append(names_map[str.upper(gene)])
+            # print 'Translated gene: %s to %s' % (gene, names_map[str.upper(gene)])
+        except KeyError:
+            genes_trans_counter[1] += 1
+            # print 'Failed to translate gene: %s' % gene
+        else:
+            genes_trans_counter[0] += 1
+            # print 'Translated gene: %s to %s' % (gene, names_map[str.upper(gene)])
 
-    # TODO: reformat structure parse to a tuple - list map (weigths, if true connection).
+    print "TFs translation: %s successes; %s failures" % tuple(TF_trans_counter)
+    print "Genes translation: %s successes; %s failures" % tuple(genes_trans_counter)
 
-    for i, j in product(range(genes_names), TFs_names):
+    TFs_names = []
+    TF_trans_counter = [0, 0]
+
+    genes_names = []
+    genes_trans_counter = [0, 0]
+
+    separate_TFs = set()
+    separate_genes = set()
+
+    re_structure = defaultdict(lambda: 0)
+
+    for TF, gene in structure:
+        separate_TFs.add(TF)
+        separate_genes.add(gene)
+        try:
+            re_structure[(reverse_names_map[str.upper(TF)],
+                          reverse_names_map[str.upper(gene)])]
+        except KeyError:
+            pass
+
+
+    for TF in separate_TFs:
+        try:
+            TFs_names.append(reverse_names_map[str.upper(TF)])
+        except KeyError:
+            TF_trans_counter[1] += 1
+            # print 'Failed to translate TF: %s' % TF
+        else:
+            TF_trans_counter[0] += 1
+            # print 'Translated TF: %s to %s' % (TF, reverse_names_map[str.upper(TF)])
+
+    for gene in separate_genes:
+        try:
+            genes_names.append(reverse_names_map[str.upper(gene)])
+        except KeyError:
+            genes_trans_counter[1] += 1
+            # print 'Failed to translate gene: %s' % gene
+        else:
+            genes_trans_counter[0] += 1
+            # print 'Translated gene: %s to %s' % (gene, reverse_names_map[str.upper(gene)])
+
+    print "TFs reverse translation: %s successes; %s failures" % tuple(TF_trans_counter)
+    print "Genes reverse translation: %s successes; %s failures" % tuple(genes_trans_counter)
+
+    for TF, gene in re_structure:
+        if gene in genes and TF is TFs:
+            re_structure[(TF, gene)] = weights[TFs.index(TF), genes.index(gene)]
+
+    print len(re_structure)
+
+    return re_structure
 
 
 if __name__ == "__main__":
@@ -124,9 +193,11 @@ if __name__ == "__main__":
         start_of_table_line=79,
         end_of_table=6509)
 
-    raw_activations_calculate_raw_activations = map_activations(names_map, connections_matrix,
-                                                                weights_matrix,
-                                                                TFs, genes)
+    raw_activations = calculate_raw_activations(names_map,
+                                                reverse_names_map,
+                                                connections_matrix,
+                                                weights_matrix,
+                                                TFs, genes)
 
     raise Exception('Debugging')
 
