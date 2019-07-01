@@ -1,5 +1,6 @@
 import numpy as np
 from csv import reader as csv_reader
+from csv import writer as csv_writer
 from matplotlib import pyplot as plt
 import logging
 import sys
@@ -86,7 +87,7 @@ def parse_names_maps(names_maps_files):
     with open(names_maps_files) as source:
         reader = csv_reader(source, delimiter="\t")
         for line in reader:
-            print line, len(line)
+            # print line, len(line)
             if line[1]:
                 ens_2_names[str.upper(line[0])] = str.upper(line[1])
                 names_2_ens[str.upper(line[1])] = str.upper(line[0])
@@ -94,89 +95,80 @@ def parse_names_maps(names_maps_files):
     return ens_2_names, names_2_ens
 
 
-def calculate_raw_activations(names_map, reverse_names_map, structure, weights, TFs, genes):
-    TFs_names = []
-    TF_trans_counter = [0, 0]
+def parse_names_maps_2(names_map_1, names_map_2):
+    names_2_uniprot = {}
 
-    genes_names = []
-    genes_trans_counter = [0, 0]
+    with open(names_map_1) as source:
+        reader = csv_reader(source)
+        for line in reader:
+            print line, len(line)
+            if line[2] != '~':
+                names_2_uniprot[line[0]] = line[2]
+            else:
+                names_2_uniprot[line[0]] = None
+
+    with open(names_map_2) as source:
+        reader = csv_reader(source)
+        for line in reader:
+            print line, len(line)
+            names_2_uniprot[line[0]] = line[2]
+
+    return names_2_uniprot
+
+
+def calculate_direct_activations(names_map, structure, weights, TFs, genes):
+
+    def gene_name_is_sane(gene_name):
+        return gene_name in names_map.keys() \
+               and names_map[gene_name] != '~' \
+
+    re_structure = {}
+    re_TFs = []
+    re_genes = []
 
     for TF in TFs:
-        TF_name = TF.split(' ')[0]
-        try:
-            TFs_names.append(names_map[str.upper(TF_name)])
-        except KeyError:
-            TF_trans_counter[1] += 1
-            # print 'Failed to translate TF: %s' % TF_name
-        else:
-            TF_trans_counter[0] += 1
-            # print 'Translated TF: %s to %s' % (TF_name, names_map[str.upper(TF_name)])
+        re_TFs.append(names_map[TF])
 
     for gene in genes:
-        try:
-            genes_names.append(names_map[str.upper(gene)])
-            # print 'Translated gene: %s to %s' % (gene, names_map[str.upper(gene)])
-        except KeyError:
-            genes_trans_counter[1] += 1
-            # print 'Failed to translate gene: %s' % gene
-        else:
-            genes_trans_counter[0] += 1
-            # print 'Translated gene: %s to %s' % (gene, names_map[str.upper(gene)])
-
-    print "TFs translation: %s successes; %s failures" % tuple(TF_trans_counter)
-    print "Genes translation: %s successes; %s failures" % tuple(genes_trans_counter)
-
-    TFs_names = []
-    TF_trans_counter = [0, 0]
-
-    genes_names = []
-    genes_trans_counter = [0, 0]
-
-    separate_TFs = set()
-    separate_genes = set()
-
-    re_structure = defaultdict(lambda: 0)
+        re_genes.append(names_map[gene])
 
     for TF, gene in structure:
-        separate_TFs.add(TF)
-        separate_genes.add(gene)
-        try:
-            re_structure[(reverse_names_map[str.upper(TF)],
-                          reverse_names_map[str.upper(gene)])]
-        except KeyError:
-            pass
+        if gene_name_is_sane(TF) and gene_name_is_sane(gene):
+            try:
+                re_structure[(names_map[TF], names_map[gene])] = weights[
+                    re_genes.index(names_map[gene]),
+                    re_TFs.index(names_map[TF])]
+            except ValueError:
+                pass
+
+    values_only_table = np.array(list(re_structure.values()))
+
+    return re_structure, values_only_table
 
 
-    for TF in separate_TFs:
-        try:
-            TFs_names.append(reverse_names_map[str.upper(TF)])
-        except KeyError:
-            TF_trans_counter[1] += 1
-            # print 'Failed to translate TF: %s' % TF
-        else:
-            TF_trans_counter[0] += 1
-            # print 'Translated TF: %s to %s' % (TF, reverse_names_map[str.upper(TF)])
+def list_present_genes(TFs, genes, connections_matrix):
+    first_set = set()
+    second_set = set()
 
-    for gene in separate_genes:
-        try:
-            genes_names.append(reverse_names_map[str.upper(gene)])
-        except KeyError:
-            genes_trans_counter[1] += 1
-            # print 'Failed to translate gene: %s' % gene
-        else:
-            genes_trans_counter[0] += 1
-            # print 'Translated gene: %s to %s' % (gene, reverse_names_map[str.upper(gene)])
+    for TF in TFs:
+        first_set.add(TF)
 
-    print "TFs reverse translation: %s successes; %s failures" % tuple(TF_trans_counter)
-    print "Genes reverse translation: %s successes; %s failures" % tuple(genes_trans_counter)
+    for gene in genes:
+        first_set.add(gene)
 
-    for TF, gene in re_structure:
-        if gene in genes and TF is TFs:
-            re_structure[(TF, gene)] = weights[TFs.index(TF), genes.index(gene)]
+    for _in, _out in connections_matrix.iterkeys():
+        second_set.add(_in)
+        second_set.add(_out)
 
-    print len(re_structure)
+    with open('table_1.csv', 'w') as sink:
+        writer = csv_writer(sink)
+        for elt in first_set:
+            writer.writerow([elt])
 
-    return re_structure
+    with open('table_2.csv', 'w') as sink:
+        writer = csv_writer(sink)
+        for elt in second_set:
+            writer.writerow([elt])
 
 
 if __name__ == "__main__":
@@ -185,7 +177,9 @@ if __name__ == "__main__":
 
     connections_matrix = parse_direct_connections("RegulationTwoColumnTable_Documented_2013927.tsv")
 
-    names_map, reverse_names_map = parse_names_maps("Ensembl_to_gene_names_map.txt")
+    # names_map, reverse_names_map = parse_names_maps("Ensembl_to_gene_names_map.txt")
+
+    names_map = parse_names_maps_2('translation_1.csv', 'translation_2.csv')
 
     weights_matrix, TFs, genes = parse_weights(
         weights_data_file='GSE4654_series_matrix.txt',  # data source for parsing
@@ -193,25 +187,38 @@ if __name__ == "__main__":
         start_of_table_line=79,
         end_of_table=6509)
 
-    raw_activations = calculate_raw_activations(names_map,
-                                                reverse_names_map,
-                                                connections_matrix,
-                                                weights_matrix,
-                                                TFs, genes)
+    # list_present_genes(TFs, genes, connections_matrix)
 
-    raise Exception('Debugging')
+    direct_activations, values_only_table = calculate_direct_activations(names_map,
+                                                      connections_matrix,
+                                                      weights_matrix,
+                                                      TFs, genes)
+
+    # TODO: plot the activations restricted ot the directly mapped ones.
+
+    # print data
+    print values_only_table
 
     # Show overall factor distribution
     data = weights_matrix.flatten()
     fltr = np.logical_not(np.isnan(data))
     density = gaussian_kde(data[fltr].flatten())
+    direct_fltr = np.logical_not(np.isnan(values_only_table))
+    direct_density = gaussian_kde(values_only_table[direct_fltr].flatten())
+
     xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
     plt.title('distribution of gene expression alteration in response to TF deletion')
+
     ax = plt.plot(xs, -np.sqrt(-np.log(density(xs))), 'k')
     plt.plot(xs, -np.sqrt(-np.log(norm.pdf(xs))), 'r')
+    plt.plot(xs, -np.sqrt(-np.log(direct_density(xs))), 'g')
+    plt.plot(xs, -np.sqrt(-np.log((direct_density(xs)+norm.pdf(xs))/2.)), 'b')
+
     plt.xlabel('z-score deviation')
     plt.ylabel('distribution density (log)')
     plt.show()
+
+    # raise Exception('Debugging')
 
     data = np.power(weights_matrix, 2)
     fltr = np.logical_not(np.isnan(data))
@@ -248,4 +255,5 @@ if __name__ == "__main__":
     plt.show()
 
     # pickle.dump(weights_matrix[np.logical_or(weights_matrix < -2, weights_matrix > 2)], open('activations.dmp', 'wb'))
-    pickle.dump(weights_matrix, open('activations.dmp', 'wb'))
+    # pickle.dump(weights_matrix, open('activations.dmp', 'wb'))
+    pickle.dump(values_only_table, open('activations.dmp', 'wb'))
