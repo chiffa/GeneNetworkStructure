@@ -5,6 +5,10 @@ from itertools import product, combinations
 from scipy.stats import gaussian_kde, norm, chi
 from matplotlib import pyplot as plt
 from time import time
+import warnings
+
+# supress divide by 0 warnings - we manage it through nans
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # declaring the variables:
 essentiality_threshold = 0.3  # epsilon - if pathway throughput falls below this value we consider pathway to fail
@@ -12,11 +16,17 @@ aneup_essentiality_threshold = 0.4  # espilon for aneuploid pathway
 min_length = 1.99  # minimal length of the pathway
 total_non_essential_pool = 5400
 independent_pathways = 17  # estimation of independent pathways in yeast
-stress_conditions = 0  # how many stress conditions are we taking in account
+stress_conditions = 250  # how many stress conditions are we taking in account
 aneuploid_passes = 20  # how many aneuploidy samples we perform to calcylate the statistics
 partial_stress_essentiality = essentiality_threshold
 partial_stress_essentiality = 0.6
 
+uniform_pathway_shape = False
+normal_activations = False
+log_norm_aneuploidy_effect = False
+eps_at_05 = False
+
+# Load and properly shape standard paremeters
 length_width = pickle.load(open('w_l_accumulator.dmp', 'r'))
 activations = pickle.load(open('activations.dmp', 'r'))
 aneup_perturbation = pickle.load(open('norm_aneup.dmp', 'r'))
@@ -34,26 +44,33 @@ randomly_perturbed = False
 activations = np.array(activations).flatten()
 activations = activations[np.logical_not(np.isnan(activations))]
 
-# ## uncomment if we want to have random perturbations:
-# essentiality_threshold = 0.5
-# aneup_essentiality_threshold = 0.6
-#
-# independent_pathways = 50
-#
-# f_length = np.random.rand(*_length.shape)
-# f_length *= np.max(_length)
-# f_length += 2.
-#
-# f_width = np.random.rand(*_width.shape)
-# f_width *= np.max(_width)
-# f_width += 1.
-#
-# _length = f_length
-# _width = f_width
-# #
-# activations = np.random.randn(*activations.shape)
-# aneup_perturbation = np.random.lognormal(0, 0.5, *aneup_perturbation.shape)
-##
+# And now override them for different perturbations
+if eps_at_05:
+    essentiality_threshold = 0.5
+    aneup_essentiality_threshold = 0.6
+    stress_conditions = 0  # to accelerate the simulation
+
+if uniform_pathway_shape:
+    f_length = np.random.rand(*_length.shape)
+    f_length *= np.max(_length)
+    f_length += 2.
+
+    f_width = np.random.rand(*_width.shape)
+    f_width *= np.max(_width)
+    f_width += 1.
+
+    _length = f_length
+    _width = f_width
+
+    stress_conditions = 0  # to accelerate the simulation
+
+if normal_activations:
+    activations = np.random.normal(0, 1, *activations.shape)
+    stress_conditions = 0  # to accelerate the simulation
+
+if log_norm_aneuploidy_effect:
+    aneup_perturbation = np.random.lognormal(0, 0.5, *aneup_perturbation.shape)
+    stress_conditions = 0  # to accelerate the simulation
 
 length_width = np.column_stack((_length, _width))
 
@@ -246,17 +263,23 @@ def simulation_run():
 
 
 def improved_plot(data, stats_of_interest, x_axis):
+
     mean = np.nanmean(data)
     std = np.nanstd(data)
-    print '%s; mean: %.4f, std: %.4f' % (stats_of_interest, mean, std)
+
+    print '\nStats:\n\t%s; mean: %.4f, std: %.4f' % (stats_of_interest, mean, std)
+
     fltr = np.logical_not(np.isnan(data))
     density = gaussian_kde(data[fltr].flatten())
     xs = np.linspace(data[fltr].min(), data[fltr].max(), 200)
+
     plt.title('Distribution of %s\n mean: %.2f; std %.2f; ' % (stats_of_interest, mean, std))
     plt.plot(xs, density(xs), 'k', label='Distribution by simulation')
     # plt.plot(xs, norm.pdf(xs, mean, std), 'r', label='Normal fitted to the simulation')
+
     maxh = np.max(norm.pdf(xs, mean, std))
     plt.vlines([mean - 2*std, mean, mean + 2*std], 0, maxh)
+
     plt.xlabel(x_axis)
     plt.ylabel('distribution density')
     plt.legend()
@@ -270,6 +293,7 @@ if __name__ == "__main__":
     ess_in_cond = []
 
     previous = time()
+
     for _i in range(0, 500):
         essentials_fraction, lethal_int_fraction, cond_ess_fraction, ess_in_cond_fraction, epistases = simulation_run()
         essentials_accumulator.append(essentials_fraction)
@@ -279,22 +303,47 @@ if __name__ == "__main__":
         print 'round %s; %.2f s' % (_i, time() - previous)
         previous = time()
 
+
+    print '\nParameters:\n' \
+          '\tess_epsilon:%.1f;\n' \
+          '\taneup_epsilon:%.1f;\n' \
+          '\tstreses:%i\n' \
+          '\taneup_passes:%i\n' \
+          '\tstress_epsilon:%.2f' % (
+        essentiality_threshold,
+        aneup_essentiality_threshold,
+        stress_conditions,
+        aneuploid_passes,
+        partial_stress_essentiality)
+
+    if uniform_pathway_shape:
+        print '\tuniform pathway shape'
+    if normal_activations:
+        print '\tnormal activations'
+    if log_norm_aneuploidy_effect:
+        print '\tlog-normal aneuploidy effect'
+    if eps_at_05:
+        print '\tepsilon at 0.5'
+
     improved_plot(np.array(essentials_accumulator)*100,
                   'essential genes prevalence',
                   'percentage of all genes')
+
     improved_plot(np.array(lethal_accumulator)*100,
                   'lethal interactions prevalence',
                   'percentage of all non-essential gene pairs')
+
     improved_plot(np.array(conditional_essentials)*100,
                   'evolvable essential genes',
                   'percentage of all essential genes')
+
     improved_plot(np.array(ess_in_cond)*100,
                   'condition-specific essential in at least 1 out of 250 conditions',
                   'percentage of all non-essential genes')
 
-    plt.plot(np.sqrt(epistases[:, 0]*epistases[:, 1]), epistases[:, 2], 'ko')
-
-    plt.show()
+    # plt.plot(np.sqrt(epistases[:, 0]*epistases[:, 1]), epistases[:, 2], 'ko')
+    #
+    # plt.show()
 
     plt.plot(_length, _width, 'ko')
     plt.ylabel('width of the pathway')
